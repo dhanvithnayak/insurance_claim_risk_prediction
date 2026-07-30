@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auto Insurance Claim Risk Prediction Engine</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #38bdf8;
+      --primary-hover: #0284c7;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --input-bg: #0f172a;
+      --input-border: #475569;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg); color: var(--text-main); min-height: 100vh; padding: 2rem 1rem; }
+    .container { max-width: 1080px; margin: 0 auto; }
+    header { text-align: center; margin-bottom: 2rem; }
+    header h1 { font-size: 2rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem; }
+    header p { color: var(--text-muted); font-size: 1rem; }
+    .badge-bar { display: flex; justify-content: center; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap; }
+    .badge { background: #334155; color: #cbd5e1; padding: 0.3rem 0.8rem; border-radius: 9999px; font-size: 0.8rem; font-weight: 500; }
+    .badge.highlight { background: rgba(56, 189, 248, 0.15); color: var(--primary); border: 1px solid rgba(56, 189, 248, 0.3); }
+
+    .grid { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 1.5rem; }
+    @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+
+    .card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 1.5rem; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3); }
+    .card h2 { font-size: 1.25rem; margin-bottom: 1.25rem; font-weight: 600; border-bottom: 1px solid var(--card-border); padding-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
+    
+    .form-section-title { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--primary); margin: 1rem 0 0.5rem 0; font-weight: 700; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 520px) { .form-grid { grid-template-columns: 1fr; } }
+
+    .form-group { display: flex; flex-direction: column; gap: 0.35rem; }
+    .form-group label { font-size: 0.85rem; color: var(--text-muted); font-weight: 500; }
+    .form-control {
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      border-radius: 6px;
+      color: var(--text-main);
+      padding: 0.6rem 0.8rem;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-control:focus { border-color: var(--primary); }
+
+    .checkbox-label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: var(--text-muted); cursor: pointer; margin-top: 0.2rem; }
+    .checkbox-label input { accent-color: var(--primary); }
+
+    .btn {
+      background: var(--primary);
+      color: #0f172a;
+      font-weight: 700;
+      border: none;
+      border-radius: 8px;
+      padding: 0.85rem 1.5rem;
+      cursor: pointer;
+      font-size: 1rem;
+      margin-top: 1.5rem;
+      width: 100%;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .btn:hover { background: var(--primary-hover); }
+    .btn:active { transform: translateY(1px); }
+
+    /* Results Card */
+    .result-container { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 1rem 0; }
+    .prob-circle {
+      width: 140px; height: 140px; border-radius: 50%;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      border: 6px solid var(--card-border);
+      margin-bottom: 1.25rem;
+      transition: all 0.4s ease;
+    }
+    .prob-val { font-size: 2.2rem; font-weight: 800; }
+    .prob-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+    .risk-tag { font-size: 1.1rem; font-weight: 700; padding: 0.4rem 1.2rem; border-radius: 9999px; margin-bottom: 1rem; }
+    .risk-low { border: 2px solid var(--success); color: var(--success); background: rgba(34, 197, 94, 0.1); }
+    .risk-mod { border: 2px solid var(--warning); color: var(--warning); background: rgba(245, 158, 11, 0.1); }
+    .risk-high { border: 2px solid var(--danger); color: var(--danger); background: rgba(239, 68, 68, 0.1); }
+
+    .info-box { background: #0f172a; border: 1px solid var(--card-border); border-radius: 8px; padding: 0.85rem; width: 100%; margin-top: 1rem; text-align: left; font-size: 0.85rem; }
+    .info-box p { margin-bottom: 0.4rem; }
+    .info-box p:last-child { margin-bottom: 0; }
+    .impute-pill { display: inline-block; background: rgba(245, 158, 11, 0.2); color: #f59e0b; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.75rem; }
+
+    footer { text-align: center; margin-top: 2.5rem; color: var(--text-muted); font-size: 0.85rem; }
+    footer a { color: var(--primary); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Auto Insurance Claim Risk Engine</h1>
+      <p>Actuarial Claim Propensity Modeling with Calibrated Logistic Regression & SHAP</p>
+      <div class="badge-bar">
+        <span class="badge highlight">Stratified 5-Fold PR-AUC: 0.8361</span>
+        <span class="badge highlight">Claim Recall: 86.69%</span>
+        <span class="badge">Baseline PR-AUC: 0.3133</span>
+        <span class="badge">FastAPI REST Microservice</span>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- Input Panel -->
+      <div class="card">
+        <h2>Policyholder & Vehicle Attributes</h2>
+        <form id="prediction-form">
+          
+          <div class="form-section-title">Demographics & Experience</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="age">Age Bracket</label>
+              <select id="age" class="form-control" required>
+                <option value="0">16 - 25 years</option>
+                <option value="1">26 - 39 years</option>
+                <option value="2" selected>40 - 64 years</option>
+                <option value="3">65+ years</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="gender">Gender</label>
+              <select id="gender" class="form-control" required>
+                <option value="0">Female</option>
+                <option value="1" selected>Male</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="driving_experience">Driving Experience (#1 Risk Driver)</label>
+              <select id="driving_experience" class="form-control" required>
+                <option value="0-9y">0 - 9 years</option>
+                <option value="10-19y">10 - 19 years</option>
+                <option value="20-29y" selected>20 - 29 years</option>
+                <option value="30y+">30+ years</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="education">Education</label>
+              <select id="education" class="form-control" required>
+                <option value="none">None</option>
+                <option value="high school">High School</option>
+                <option value="university" selected>University</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="income">Income Bracket</label>
+              <select id="income" class="form-control" required>
+                <option value="poverty">Poverty</option>
+                <option value="working class">Working Class</option>
+                <option value="middle class">Middle Class</option>
+                <option value="upper class" selected>Upper Class</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="married">Marital Status</label>
+              <select id="married" class="form-control" required>
+                <option value="1.0" selected>Married</option>
+                <option value="0.0">Single</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="children">Has Children</label>
+              <select id="children" class="form-control" required>
+                <option value="1.0" selected>Yes</option>
+                <option value="0.0">No</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="credit_score">Credit Score (0.0 - 1.0)</label>
+              <input type="number" id="credit_score" class="form-control" step="0.01" min="0" max="1" value="0.63">
+              <label class="checkbox-label">
+                <input type="checkbox" id="missing_cs"> Omit (test median imputation)
+              </label>
+            </div>
+          </div>
+
+          <div class="form-section-title">Vehicle & Location Profile</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="vehicle_ownership">Vehicle Ownership</label>
+              <select id="vehicle_ownership" class="form-control" required>
+                <option value="1.0" selected>Owned</option>
+                <option value="0.0">Financed / Leased</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="vehicle_year">Vehicle Manufacturing</label>
+              <select id="vehicle_year" class="form-control" required>
+                <option value="after 2015" selected>After 2015 (Modern)</option>
+                <option value="before 2015">Before 2015 (Older)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="vehicle_type">Vehicle Type</label>
+              <select id="vehicle_type" class="form-control" required>
+                <option value="sedan" selected>Sedan</option>
+                <option value="sports car">Sports Car</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="postal_code">Territory ZIP Code</label>
+              <select id="postal_code" class="form-control" required>
+                <option value="10238" selected>10238 (Standard - 27.2% Claim Rate)</option>
+                <option value="32765">32765 (Suburban - 37.7% Claim Rate)</option>
+                <option value="92101">92101 (Urban - 41.3% Claim Rate)</option>
+                <option value="21217">21217 (Anomaly Cluster - 100% Claim Rate)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="annual_mileage">Annual Mileage</label>
+              <input type="number" id="annual_mileage" class="form-control" step="500" min="0" value="12000">
+              <label class="checkbox-label">
+                <input type="checkbox" id="missing_am"> Omit (test median imputation)
+              </label>
+            </div>
+          </div>
+
+          <div class="form-section-title">Violations & Incident Record</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="speeding_violations">Speeding Violations</label>
+              <input type="number" id="speeding_violations" class="form-control" min="0" value="0" required>
+            </div>
+            <div class="form-group">
+              <label for="duis">DUIs</label>
+              <input type="number" id="duis" class="form-control" min="0" value="0" required>
+            </div>
+            <div class="form-group">
+              <label for="past_accidents">Past Accidents</label>
+              <input type="number" id="past_accidents" class="form-control" min="0" value="0" required>
+            </div>
+          </div>
+
+          <button type="submit" class="btn" id="submit-btn">Score Policy Risk</button>
+        </form>
+      </div>
+
+      <!-- Live Prediction Result Card -->
+      <div class="card">
+        <h2>Actuarial Risk Assessment</h2>
+        <div class="result-container">
+          <div class="prob-circle" id="prob-circle">
+            <span class="prob-val" id="prob-val">0.7%</span>
+            <span class="prob-label">Claim Risk</span>
+          </div>
+          
+          <div class="risk-tag risk-low" id="risk-tag">LOW RISK</div>
+
+          <div class="info-box">
+            <p><strong>Underwriting Decision:</strong> <span id="decision-text">Standard policy approval recommended.</span></p>
+            <p><strong>Predicted Outcome:</strong> <span id="class-text">No Claim Anticipated (Class 0)</span></p>
+            <p id="imputed-notice" style="display: none; margin-top: 0.5rem;">
+              <strong>Imputation Active:</strong> <span id="imputed-list" class="impute-pill"></span>
+            </p>
+          </div>
+
+          <div class="info-box" style="margin-top: 0.75rem;">
+            <p><strong>Model Engine:</strong> Calibrated L2 Logistic Regression</p>
+            <p><strong>API Endpoint:</strong> <code>POST /predict</code></p>
+            <p><strong>Swagger Docs:</strong> <a href="/docs" target="_blank" style="color: var(--primary);">Interactive API Spec</a></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      <p>Auto Insurance Claim Risk Prediction &copy; 2026 | Built with FastAPI, Scikit-Learn, Docker & GitHub Actions</p>
+    </footer>
+  </div>
+
+  <script>
+    const form = document.getElementById('prediction-form');
+    const missingCsCheck = document.getElementById('missing_cs');
+    const csInput = document.getElementById('credit_score');
+    const missingAmCheck = document.getElementById('missing_am');
+    const amInput = document.getElementById('annual_mileage');
+
+    missingCsCheck.addEventListener('change', () => {
+      csInput.disabled = missingCsCheck.checked;
+    });
+    missingAmCheck.addEventListener('change', () => {
+      amInput.disabled = missingAmCheck.checked;
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const payload = {
+        age: parseInt(document.getElementById('age').value),
+        gender: parseInt(document.getElementById('gender').value),
+        driving_experience: document.getElementById('driving_experience').value,
+        education: document.getElementById('education').value,
+        income: document.getElementById('income').value,
+        credit_score: missingCsCheck.checked ? null : (csInput.value === '' ? null : parseFloat(csInput.value)),
+        vehicle_ownership: parseFloat(document.getElementById('vehicle_ownership').value),
+        vehicle_year: document.getElementById('vehicle_year').value,
+        married: parseFloat(document.getElementById('married').value),
+        children: parseFloat(document.getElementById('children').value),
+        postal_code: parseInt(document.getElementById('postal_code').value),
+        annual_mileage: missingAmCheck.checked ? null : (amInput.value === '' ? null : parseFloat(amInput.value)),
+        vehicle_type: document.getElementById('vehicle_type').value,
+        speeding_violations: parseInt(document.getElementById('speeding_violations').value),
+        duis: parseInt(document.getElementById('duis').value),
+        past_accidents: parseInt(document.getElementById('past_accidents').value),
+      };
+
+      try {
+        const res = await fetch('/predict', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) throw new Error(`Server returned status ${res.status}`);
+        const data = await res.json();
+
+        // Update UI
+        const probPct = (data.claim_probability * 100).toFixed(1) + '%';
+        document.getElementById('prob-val').textContent = probPct;
+
+        const probCircle = document.getElementById('prob-circle');
+        const riskTag = document.getElementById('risk-tag');
+        const decisionText = document.getElementById('decision-text');
+        const classText = document.getElementById('class-text');
+        const imputedNotice = document.getElementById('imputed-notice');
+        const imputedList = document.getElementById('imputed-list');
+
+        riskTag.className = 'risk-tag';
+        if (data.risk_tier === 'High') {
+          riskTag.classList.add('risk-high');
+          riskTag.textContent = 'HIGH RISK';
+          probCircle.style.borderColor = 'var(--danger)';
+          probCircle.style.color = 'var(--danger)';
+          decisionText.textContent = 'High claim probability. Actuarial surcharge or manual underwriting review required.';
+        } else if (data.risk_tier === 'Moderate') {
+          riskTag.classList.add('risk-mod');
+          riskTag.textContent = 'MODERATE RISK';
+          probCircle.style.borderColor = 'var(--warning)';
+          probCircle.style.color = 'var(--warning)';
+          decisionText.textContent = 'Moderate claim risk. Standard underwriting with adjusted deductible.';
+        } else {
+          riskTag.classList.add('risk-low');
+          riskTag.textContent = 'LOW RISK';
+          probCircle.style.borderColor = 'var(--success)';
+          probCircle.style.color = 'var(--success)';
+          decisionText.textContent = 'Standard policy approval recommended.';
+        }
+
+        classText.textContent = data.predicted_claim === 1 ? 'Claim Likely (Class 1)' : 'No Claim Anticipated (Class 0)';
+
+        if (data.missing_fields_imputed && data.missing_fields_imputed.length > 0) {
+          imputedNotice.style.display = 'block';
+          imputedList.textContent = data.missing_fields_imputed.join(', ') + ' filled with training median';
+        } else {
+          imputedNotice.style.display = 'none';
+        }
+
+      } catch (err) {
+        alert('Error fetching prediction: ' + err.message);
+      }
+    });
+
+    // Run initial trigger on page load
+    window.addEventListener('DOMContentLoaded', () => {
+      form.dispatchEvent(new Event('submit'));
+    });
+  </script>
+</body>
+</html>

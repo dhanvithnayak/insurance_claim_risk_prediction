@@ -1,54 +1,35 @@
 """
 Production FastAPI microservice for Car Insurance Claim Prediction.
 
-Single-endpoint deployment accepting customer demographic and vehicle data,
-applying the fitted preprocessing pipeline, and returning claim probability
-and predicted outcome class.
+Provides:
+  - GET  /         --> Interactive Web Dashboard (HTML5/CSS3)
+  - POST /predict  --> Machine Learning Inference Endpoint (REST JSON)
+  - GET  /health   --> Liveness / Readiness Container Health Probe
+  - GET  /docs     --> Swagger / OpenAPI Documentation
 
 Run with:
     uvicorn app:app --host 0.0.0.0 --port 8000
 """
 
 import os
-from typing import Optional
+from contextlib import asynccontextmanager
+
+import joblib
 import numpy as np
 import pandas as pd
-import joblib
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
-
-# ==============================================================================
-# INFERENCE-TIME EDGE CASE HANDLING DOCUMENTATION
-# ==============================================================================
-# 1. Missing Values (credit_score and annual_mileage):
-#    - The scikit-learn pipeline incorporates a SimpleImputer(strategy='median')
-#      fitted strictly on the training set.
-#    - If credit_score or annual_mileage is null/None/NaN in the incoming JSON,
-#      it is automatically replaced with the training median (~0.525 for credit_score,
-#      ~12,000 for annual_mileage) before scaling and inference.
-#
-# 2. Unseen Categorical Levels:
-#    - Nominal features (vehicle_year, vehicle_type, postal_code) are handled by
-#      OneHotEncoder(handle_unknown='ignore', drop='first'). If an unknown postal
-#      code or vehicle type arrives, all one-hot indicator columns for that feature
-#      default to 0 (baseline category behavior) without raising an exception.
-#    - Ordinal features (driving_experience, education, income) are handled by
-#      OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1). Any
-#      unseen category is mapped to -1 without causing runtime failure.
-# ==============================================================================
-
-app = FastAPI(
-    title="Car Insurance Claim Prediction API",
-    description="Minimal production endpoint predicting auto insurance claim risk.",
-    version="1.0.0",
-)
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from pydantic import BaseModel, ConfigDict, Field
 
 MODEL_PATH = os.path.join(os.path.dirname(__file__), "model_pipeline.joblib")
+TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "templates", "index.html")
+
 pipeline = None
 
 
-@app.on_event("startup")
-def load_model():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     """Load serialized preprocessing and model pipeline on service startup."""
     global pipeline
     if not os.path.exists(MODEL_PATH):
@@ -57,28 +38,29 @@ def load_model():
             "Run 'python car_insurance_analysis.py' first to train and serialize the pipeline."
         )
     pipeline = joblib.load(MODEL_PATH)
+    yield
+
+
+app = FastAPI(
+    title="Auto Insurance Claim Risk Prediction API",
+    description="Actuarial risk scoring microservice for automobile insurance policies.",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+# Enable CORS for external frontends or multi-service deployments
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class CustomerFeatures(BaseModel):
-    age: int = Field(..., ge=0, le=3, description="Age group: 0 (16-25), 1 (26-39), 2 (40-64), 3 (65+)")
-    gender: int = Field(..., ge=0, le=1, description="Gender: 0 (female), 1 (male)")
-    driving_experience: str = Field(..., description="Driving experience bracket: '0-9y', '10-19y', '20-29y', '30y+'")
-    education: str = Field(..., description="Education: 'none', 'high school', 'university'")
-    income: str = Field(..., description="Income group: 'poverty', 'working class', 'middle class', 'upper class'")
-    credit_score: Optional[float] = Field(None, ge=0.0, le=1.0, description="Credit score between 0 and 1 (optional)")
-    vehicle_ownership: float = Field(..., ge=0.0, le=1.0, description="Vehicle ownership: 1.0 (owns car), 0.0 (does not)")
-    vehicle_year: str = Field(..., description="Vehicle year: 'before 2015' or 'after 2015'")
-    married: float = Field(..., ge=0.0, le=1.0, description="Marital status: 1.0 (married), 0.0 (single)")
-    children: float = Field(..., ge=0.0, le=1.0, description="Has children: 1.0 (yes), 0.0 (no)")
-    postal_code: int = Field(..., description="Postal code integer: 10238, 21217, 32765, 92101")
-    annual_mileage: Optional[float] = Field(None, ge=0.0, description="Annual mileage in miles (optional)")
-    vehicle_type: str = Field(..., description="Vehicle type: 'sedan' or 'sports car'")
-    speeding_violations: int = Field(..., ge=0, description="Number of speeding violations")
-    duis: int = Field(..., ge=0, description="Number of DUIs")
-    past_accidents: int = Field(..., ge=0, description="Number of past accidents")
-
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "age": 2,
                 "gender": 1,
@@ -98,6 +80,24 @@ class CustomerFeatures(BaseModel):
                 "past_accidents": 0,
             }
         }
+    )
+
+    age: int = Field(..., ge=0, le=3, description="Age group: 0 (16-25), 1 (26-39), 2 (40-64), 3 (65+)")
+    gender: int = Field(..., ge=0, le=1, description="Gender: 0 (female), 1 (male)")
+    driving_experience: str = Field(..., description="Driving experience bracket: '0-9y', '10-19y', '20-29y', '30y+'")
+    education: str = Field(..., description="Education: 'none', 'high school', 'university'")
+    income: str = Field(..., description="Income group: 'poverty', 'working class', 'middle class', 'upper class'")
+    credit_score: float | None = Field(None, ge=0.0, le=1.0, description="Credit score between 0 and 1 (optional)")
+    vehicle_ownership: float = Field(..., ge=0.0, le=1.0, description="Vehicle ownership: 1.0 (owns car), 0.0 (does not)")
+    vehicle_year: str = Field(..., description="Vehicle year: 'before 2015' or 'after 2015'")
+    married: float = Field(..., ge=0.0, le=1.0, description="Marital status: 1.0 (married), 0.0 (single)")
+    children: float = Field(..., ge=0.0, le=1.0, description="Has children: 1.0 (yes), 0.0 (no)")
+    postal_code: int = Field(..., description="Postal code integer: 10238, 21217, 32765, 92101")
+    annual_mileage: float | None = Field(None, ge=0.0, description="Annual mileage in miles (optional)")
+    vehicle_type: str = Field(..., description="Vehicle type: 'sedan' or 'sports car'")
+    speeding_violations: int = Field(..., ge=0, description="Number of speeding violations")
+    duis: int = Field(..., ge=0, description="Number of DUIs")
+    past_accidents: int = Field(..., ge=0, description="Number of past accidents")
 
 
 class PredictionResponse(BaseModel):
@@ -107,12 +107,21 @@ class PredictionResponse(BaseModel):
     missing_fields_imputed: list[str]
 
 
-@app.get("/")
+@app.get("/", response_class=HTMLResponse)
+def serve_dashboard():
+    """Serve the embedded interactive web UI."""
+    if os.path.exists(TEMPLATE_PATH):
+        with open(TEMPLATE_PATH, "r", encoding="utf-8") as f:
+            return f.read()
+    return HTMLResponse("<h2>Web dashboard template not found. Visit <a href='/docs'>/docs</a> for API.</h2>", status_code=200)
+
+
+@app.get("/health")
 def health_check():
-    """Service health and readiness check."""
+    """Liveness probe for Docker container health checks and Kubernetes/cloud orchestrators."""
     return {
         "status": "healthy",
-        "service": "car-insurance-claim-predictor",
+        "service": "auto-insurance-claim-risk-prediction",
         "model_loaded": pipeline is not None,
     }
 
@@ -121,7 +130,7 @@ def health_check():
 def predict_claim(payload: CustomerFeatures):
     """
     Accepts customer profile JSON, applies pipeline preprocessing,
-    and returns predicted claim probability and classification.
+    and returns predicted claim probability and risk classification.
     """
     global pipeline
     if pipeline is None:
@@ -133,14 +142,12 @@ def predict_claim(payload: CustomerFeatures):
                 detail="Model pipeline has not been trained or saved yet.",
             )
 
-    # Track missing fields for transparency
     missing_imputed = []
     if payload.credit_score is None:
         missing_imputed.append("credit_score")
     if payload.annual_mileage is None:
         missing_imputed.append("annual_mileage")
 
-    # Format into DataFrame with correct columns for ColumnTransformer
     input_data = {
         "age": [payload.age],
         "gender": [payload.gender],
@@ -178,8 +185,8 @@ def predict_claim(payload: CustomerFeatures):
             risk_tier=risk_tier,
             missing_fields_imputed=missing_imputed,
         )
-    except Exception as e:
+    except (ValueError, TypeError, KeyError, RuntimeError) as e:
         raise HTTPException(
             status_code=400,
-            detail=f"Inference error during pipeline execution: {str(e)}",
-        )
+            detail=f"Inference error during pipeline execution: {e!s}",
+        ) from e
