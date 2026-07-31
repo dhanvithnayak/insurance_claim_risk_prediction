@@ -1,0 +1,33 @@
+# Version control
+.git/
+.gitignore
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Data and training scripts (not needed for inference image)
+data/
+car_insurance.csv
+car_insurance_analysis.py
+
+# Tests and temporary files
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+scratch/
+*.log
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
