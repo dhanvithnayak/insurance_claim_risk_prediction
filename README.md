@@ -1,6 +1,6 @@
-# Auto Insurance Claim Risk Prediction & Propensity Engine
+# Auto Insurance Claim Risk Prediction Engine
 
-[![CI/CD Pipeline](https://github.com/dhanvithnayak/insurance_claim_risk_prediction/actions/workflows/ci.yml/badge.svg)](https://github.com/dhanvithnayak/insurance_claim_risk_prediction/actions/workflows/ci.yml)
+<!-- [![CI/CD Pipeline](https://github.com/dhanvithnayak/insurance_claim_risk_prediction/actions/workflows/ci.yml/badge.svg)](https://github.com/dhanvithnayak/insurance_claim_risk_prediction/actions/workflows/ci.yml) -->
 
 An end-to-end, actuarially sound machine learning pipeline, containerized inference microservice, and interactive web dashboard that predicts the probability of personal auto insurance policyholders filing a claim.
 
